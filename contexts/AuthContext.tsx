@@ -2,8 +2,10 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth"
+import type { Database } from "@/lib/database.types"
 
-export type UserRole = "admin" | "farmer-attendant" | "pasture-manager" | "veterinary-doctor"
+export type UserRole = Database['public']['Enums']['user_role']
 
 export interface User {
   id: string
@@ -27,63 +29,42 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const { 
+    user: supabaseUser, 
+    profile, 
+    loading, 
+    signIn, 
+    signOut 
+  } = useSupabaseAuth()
 
-  useEffect(() => {
-    // TODO: Check for existing session
-    const checkAuth = async () => {
-      try {
-        // Simulate checking for existing session
-        const savedUser = localStorage.getItem("currentUser")
-        if (savedUser) {
-          setUser(JSON.parse(savedUser))
-        }
-      } catch (error) {
-        console.error("Auth check failed:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    checkAuth()
-  }, [])
+  // Transform Supabase user and profile into the expected User format
+  const user: User | null = supabaseUser && profile ? {
+    id: supabaseUser.id,
+    name: profile.full_name,
+    email: supabaseUser.email || '',
+    phone: profile.phone || '',
+    role: profile.role,
+    status: profile.status as "active" | "inactive",
+    lastLogin: profile.last_login || undefined,
+    createdAt: profile.created_at,
+    avatar: profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase()
+  } : null
 
   const login = async (email: string, password: string) => {
-    setIsLoading(true)
     try {
-      // TODO: Implement actual login API call
-      console.log("Login attempt:", { email, password })
-
-      // Mock user data based on email
-      const mockUser: User = {
-        id: "1",
-        name: email.includes("admin") ? "Admin User" : "John Doe",
-        email,
-        phone: "+1234567890",
-        role: email.includes("admin") ? "admin" : "farmer-attendant",
-        status: "active",
-        lastLogin: new Date().toISOString(),
-        createdAt: "2024-01-15",
-        avatar: email.includes("admin") ? "AU" : "JD",
-      }
-
-      setUser(mockUser)
-      localStorage.setItem("currentUser", JSON.stringify(mockUser))
+      const { error } = await signIn(email, password)
+      if (error) throw error
     } catch (error) {
       console.error("Login failed:", error)
       throw error
-    } finally {
-      setIsLoading(false)
     }
   }
 
   const logout = () => {
-    setUser(null)
-    localStorage.removeItem("currentUser")
+    signOut()
   }
 
-  return <AuthContext.Provider value={{ user, login, logout, isLoading }}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={{ user, login, logout, isLoading: loading }}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {

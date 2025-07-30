@@ -10,9 +10,10 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth"
 
 export default function SignUpForm() {
+  const { signUp } = useSupabaseAuth()
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -25,39 +26,35 @@ export default function SignUpForm() {
   const [isLoading, setIsLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault()
-  setIsLoading(true)
+    e.preventDefault()
+    setIsLoading(true)
 
-  // Optional: Basic validation
-  if (formData.password !== formData.confirmPassword) {
-    alert("Passwords do not match")
-    setIsLoading(false)
-    return
-  }
+    // Basic validation
+    if (formData.password !== formData.confirmPassword) {
+      alert("Passwords do not match")
+      setIsLoading(false)
+      return
+    }
 
-  try {
-    const response = await fetch(`${BASE_URL}/auth/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        username: formData.fullName,
-        email: formData.email,
-        phonenumber: formData.phone,
-        role: formData.role,
-        password: formData.password,
-      }),
-    })
-    const data = await response.json()
-    if (!response.ok) throw new Error(data.message || "Signup failed")
-    // Handle success (e.g., redirect, show message)
-    window.location.href = "/auth/signin" // Redirect to sign in page after successful signup
-  } catch (error) {
-    console.error("Sign up error:", error)
-    alert("Sign up failed: " + error)
-  } finally {
-    setIsLoading(false)
+    try {
+      const { error } = await signUp(formData.email, formData.password, {
+        full_name: formData.fullName,
+        phone: formData.phone,
+        role: formData.role as any
+      })
+      
+      if (error) throw error
+      
+      alert("Account created successfully! Please check your email to verify your account.")
+      window.location.href = "/auth/signin"
+    } catch (error) {
+      console.error("Sign up error:", error)
+      alert("Sign up failed: " + (error instanceof Error ? error.message : error))
+    } finally {
+      setIsLoading(false)
+    }
   }
-}
+  
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
@@ -129,12 +126,9 @@ export default function SignUpForm() {
               <SelectValue placeholder="Select your role" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="farm_attendant">Farm Attendant</SelectItem>
-              <SelectItem value="veterinarian">Veterinarian</SelectItem>
+              <SelectItem value="farmer-attendant">Farmer Attendant</SelectItem>
+              <SelectItem value="veterinary-doctor">Veterinary Doctor</SelectItem>
               <SelectItem value="pasture_manager">Pasture Manager</SelectItem>
-              <SelectItem value="farm_manager">Farm Manager</SelectItem>
-              <SelectItem value="maintenance_officer">Maintenance Officer</SelectItem>
-              <SelectItem value="field_production_officer">Field Production Officer</SelectItem>
             </SelectContent>
           </Select>
         </div>
